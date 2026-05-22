@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CB Portfolio Convexity — ATM vs Barbell</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root{
+    --bg:#0b0e13; --panel:#11161e; --panel2:#161c26; --line:#232b38; --line2:#2d3744;
+    --text:#e7eef6; --muted:#8a97a8; --dim:#5b6675;
+    --atm:#4493f8; --atm-dim:#1c4f8f;
+    --bar:#f0883e; --bar-dim:#8a4d22;
+    --pos:#3fb950; --neg:#f25555; --warn:#e3b341;
+    --mono:'IBM Plex Mono',ui-monospace,monospace; --sans:'Manrope',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.55;
+    padding:28px 30px 60px;-webkit-font-smoothing:antialiased;
+    background-image:radial-gradient(circle at 18% -8%,rgba(68,147,248,.06),transparent 42%),radial-gradient(circle at 92% 4%,rgba(240,136,62,.05),transparent 40%);}
+  .wrap{max-width:1180px;margin:0 auto}
+  header{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:18px;
+    border-bottom:1px solid var(--line);padding-bottom:20px;margin-bottom:24px}
+  h1{font-size:21px;font-weight:700;letter-spacing:-.01em}
+  h1 .accent{color:var(--bar)}
+  .sub{color:var(--muted);font-size:13px;margin-top:5px;max-width:640px}
+  .spotbig{text-align:right;font-family:var(--mono)}
+  .spotbig .lbl{color:var(--dim);font-size:11px;letter-spacing:.12em;text-transform:uppercase}
+  .spotbig .val{font-size:34px;font-weight:600;line-height:1;color:var(--text)}
+  .spotbig .val::before{content:'S = ';color:var(--dim);font-size:18px;font-weight:400}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:18px}
+  .panel h2{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:14px}
+
+  .spotrow{display:flex;align-items:center;gap:16px;margin-bottom:6px}
+  .spotrow label{font-family:var(--mono);font-size:12px;color:var(--muted);white-space:nowrap}
+  input[type=range]{-webkit-appearance:none;appearance:none;height:5px;border-radius:5px;flex:1;
+    background:linear-gradient(90deg,var(--atm-dim),var(--bar-dim));outline:none}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;
+    background:var(--text);border:3px solid var(--bg);cursor:pointer;box-shadow:0 0 0 1px var(--line2)}
+  input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--text);border:3px solid var(--bg);cursor:pointer}
+
+  .params{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-top:16px}
+  .pf{display:flex;flex-direction:column;gap:5px}
+  .pf label{font-family:var(--mono);font-size:11px;color:var(--dim);letter-spacing:.04em}
+  .pf input{background:var(--panel2);border:1px solid var(--line2);border-radius:7px;color:var(--text);
+    font-family:var(--mono);font-size:13px;padding:8px 10px;width:100%}
+  .pf input:focus{outline:none;border-color:var(--atm)}
+  .pf.barleg input:focus{border-color:var(--bar)}
+  .pf .tag{font-size:9px;padding:1px 6px;border-radius:4px;letter-spacing:.06em;text-transform:uppercase}
+  .tag-atm{background:var(--atm-dim);color:#bcd8fb}
+  .tag-bar{background:var(--bar-dim);color:#f6cfa9}
+
+  .actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+  button{font-family:var(--sans);font-size:12.5px;font-weight:600;padding:8px 15px;border-radius:7px;cursor:pointer;
+    border:1px solid var(--line2);background:var(--panel2);color:var(--text);transition:.12s}
+  button:hover{border-color:var(--muted);background:#1d2531}
+  button.ghost{background:transparent}
+
+  .legend{display:flex;gap:22px;margin:2px 0 18px;font-family:var(--mono);font-size:12px}
+  .legend span{display:flex;align-items:center;gap:7px;color:var(--muted)}
+  .swatch{width:18px;height:3px;border-radius:2px;display:inline-block}
+
+  .cards{display:grid;grid-template-columns:repeat(5,1fr);gap:11px;margin-bottom:18px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:12px 14px;position:relative;overflow:hidden}
+  .card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px}
+  .card.atm::before{background:var(--atm)} .card.bar::before{background:var(--bar)}
+  .card .k{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim)}
+  .card .who{font-size:9.5px;font-weight:700;letter-spacing:.05em}
+  .card.atm .who{color:var(--atm)} .card.bar .who{color:var(--bar)}
+  .card .v{font-family:var(--mono);font-size:22px;font-weight:600;margin-top:6px;letter-spacing:-.02em}
+  .card .u{font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-top:1px}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .chartbox{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px 18px}
+  .chartbox .ct{font-size:13px;font-weight:600;margin-bottom:2px}
+  .chartbox .cs{font-family:var(--mono);font-size:11px;color:var(--dim);margin-bottom:12px}
+  .cv{position:relative;width:100%;height:210px}
+
+  .stress{display:grid;grid-template-columns:300px 1fr;gap:24px}
+  .stressctl{display:flex;flex-direction:column;gap:14px}
+  .scn{display:flex;gap:8px;flex-wrap:wrap}
+  .scn button{flex:1;min-width:70px}
+  .scn button.on{border-color:var(--bar);background:var(--bar-dim);color:#fbe3cd}
+  .pnlrow{display:flex;flex-direction:column;gap:14px}
+  .pnlbook{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+  .pnlbook .h{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:11px}
+  .pnlbook .h .nm{font-weight:700;font-size:13px}
+  .pnlbook.atm .nm{color:var(--atm)} .pnlbook.bar .nm{color:var(--bar)}
+  .pnlbook .h .tot{font-family:var(--mono);font-size:20px;font-weight:600}
+  .bar2{display:flex;flex-direction:column;gap:8px}
+  .bl{display:grid;grid-template-columns:84px 1fr 62px;align-items:center;gap:10px;font-family:var(--mono);font-size:11.5px}
+  .bl .nme{color:var(--muted)}
+  .track{height:9px;background:var(--bg);border-radius:5px;position:relative;overflow:hidden}
+  .fill{position:absolute;top:0;bottom:0;border-radius:5px}
+  .bl .amt{text-align:right}
+  .note{background:rgba(227,179,65,.08);border:1px solid rgba(227,179,65,.28);border-radius:9px;
+    padding:11px 14px;font-size:12.5px;color:#f0d590;margin-top:4px;display:flex;gap:9px;align-items:flex-start}
+  .note b{color:var(--warn)}
+  .pos{color:var(--pos)} .neg{color:var(--neg)}
+  footer{margin-top:34px;padding-top:18px;border-top:1px solid var(--line);color:var(--dim);font-size:11.5px;font-family:var(--mono);line-height:1.7}
+  @media(max-width:860px){.cards{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}.stress{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1>CB Portfolio Convexity <span class="accent">// ATM vs Barbell</span></h1>
+      <div class="sub">Comparaison de deux books de convertibles à delta voisin : un book <b>ATM</b> (convexité concentrée au spot) contre un <b>barbell OTM + ITM</b> (convexité réservée dans les ailes). Profils delta / $gamma / vega / theta recalculés en direct, plus un panneau de stress crédit-equity.</div>
+    </div>
+    <div class="spotbig"><div class="lbl">Sous-jacent</div><div class="val" id="spotOut">100</div></div>
+  </header>
+
+  <div class="panel">
+    <h2>Paramètres du marché &amp; des trois jambes</h2>
+    <div class="spotrow">
+      <label>spot 40 ▸ 190</label>
+      <input type="range" id="spot" min="40" max="190" value="100" step="1">
+    </div>
+    <div class="params">
+      <div class="pf"><label>Vol implicite σ (%)</label><input id="sig" type="number" value="30" step="1"></div>
+      <div class="pf"><label>Maturité T (ans)</label><input id="mat" type="number" value="3" step="0.5"></div>
+      <div class="pf"><label>Taux sans risque r (%)</label><input id="rf" type="number" value="3.5" step="0.25"></div>
+      <div class="pf"><label>Spread crédit (bps)</label><input id="cs" type="number" value="250" step="25"></div>
+      <div class="pf"><label>Coupon (%)</label><input id="cpn" type="number" value="1.5" step="0.25"></div>
+      <div class="pf"><label><span class="tag tag-atm">ATM</span> prix conv.</label><input id="kAtm" type="number" value="100" step="1"></div>
+      <div class="pf barleg"><label><span class="tag tag-bar">OTM</span> prix conv.</label><input id="kOtm" type="number" value="150" step="1"></div>
+      <div class="pf barleg"><label><span class="tag tag-bar">ITM</span> prix conv.</label><input id="kItm" type="number" value="72" step="1"></div>
+    </div>
+    <div class="actions">
+      <button class="ghost" id="reset">↺ Réinitialiser</button>
+      <button id="export">⤓ Exporter les profils (CSV)</button>
+    </div>
+  </div>
+
+  <div class="cards" id="cards"></div>
+
+  <div class="legend">
+    <span><span class="swatch" style="background:var(--atm)"></span>Book ATM</span>
+    <span><span class="swatch" style="background:var(--bar)"></span>Barbell OTM + ITM</span>
+    <span style="color:var(--dim)">— ligne pointillée = spot courant</span>
+  </div>
+
+  <div class="grid2" style="margin-bottom:18px">
+    <div class="chartbox"><div class="ct">Delta du portefeuille</div><div class="cs">parité-delta, 0 → 1</div><div class="cv"><canvas id="cDelta"></canvas></div></div>
+    <div class="chartbox"><div class="ct">Convexité — $ gamma</div><div class="cs">P&amp;L par % de mouvement, indexé (pic ATM = 100)</div><div class="cv"><canvas id="cGamma"></canvas></div></div>
+    <div class="chartbox"><div class="ct">Vega</div><div class="cs">points de prix par point de vol</div><div class="cv"><canvas id="cVega"></canvas></div></div>
+    <div class="chartbox"><div class="ct">Theta optionnel</div><div class="cs">loyer du gamma — points par mois</div><div class="cv"><canvas id="cTheta"></canvas></div></div>
+  </div>
+
+  <div class="panel">
+    <h2>Stress crédit-equity — quand la « double protection » lâche</h2>
+    <div class="stress">
+      <div class="stressctl">
+        <div>
+          <label style="font-family:var(--mono);font-size:11px;color:var(--dim);display:block;margin-bottom:7px">Choc equity</label>
+          <div class="scn" id="scnEq"></div>
+        </div>
+        <div>
+          <label style="font-family:var(--mono);font-size:11px;color:var(--dim);display:block;margin-bottom:7px">Écartement de spread</label>
+          <div class="scn" id="scnSp"></div>
+        </div>
+        <div class="note"><span>⚠</span><span id="stressNote"></span></div>
+      </div>
+      <div class="pnlrow" id="pnlrow"></div>
+    </div>
+  </div>
+
+  <footer id="foot"></footer>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var S0=100;
+  var $=function(id){return document.getElementById(id);};
+
+  function erf(x){var t=1/(1+0.3275911*Math.abs(x));var y=1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-x*x);return x>=0?y:-y;}
+  function ncdf(x){return 0.5*(1+erf(x/Math.SQRT2));}
+  function npdf(x){return Math.exp(-x*x/2)/Math.sqrt(2*Math.PI);}
+
+  function P(){
+    return {
+      sig:Math.max(.01,(+$("sig").value)/100),
+      T:Math.max(.05,+$("mat").value),
+      r:(+$("rf").value)/100,
+      cs:(+$("cs").value)/10000,
+      cpn:(+$("cpn").value)/100,
+      kAtm:+$("kAtm").value, kOtm:+$("kOtm").value, kItm:+$("kItm").value
+    };
+  }
+
+  function bs(S,K,p){
+    var v=p.sig*Math.sqrt(p.T);
+    var d1=(Math.log(S/K)+(p.r+p.sig*p.sig/2)*p.T)/v;
+    var d2=d1-v;
+    var nd1=npdf(d1);
+    var call=S*ncdf(d1)-K*Math.exp(-p.r*p.T)*ncdf(d2);
+    var delta=ncdf(d1);
+    var gamma=nd1/(S*v);
+    var vega=S*nd1*Math.sqrt(p.T);
+    var thetaYr=-(S*nd1*p.sig)/(2*Math.sqrt(p.T))-p.r*K*Math.exp(-p.r*p.T)*ncdf(d2);
+    return {call:call,delta:delta,gamma:gamma,vega:vega,thetaYr:thetaYr};
+  }
+
+  function ivFloor(p,csOverride){
+    var cs=(csOverride==null)?p.cs:csOverride;
+    var disc=p.r+cs;
+    var annuity=(disc<=0)?p.T:(1-Math.exp(-disc*p.T))/disc;
+    return 100*p.cpn*annuity+100*Math.exp(-disc*p.T);
+  }
+
+  function leg(S,K,p,csOverride){
+    var shares=100/K;
+    var o=bs(S,K,p);
+    var iv=ivFloor(p,csOverride);
+    return {
+      price:iv+shares*o.call,
+      delta:o.delta,
+      pDelta:shares*o.delta,
+      dGamma:shares*o.gamma*S*S,
+      vega:shares*o.vega*0.01,
+      thetaM:shares*o.thetaYr/12,
+      iv:iv
+    };
+  }
+
+  function books(S,p,csOverride){
+    var atm=leg(S,p.kAtm,p,csOverride);
+    var lo=leg(S,p.kOtm,p,csOverride), li=leg(S,p.kItm,p,csOverride);
+    var bar={
+      price:0.5*(lo.price+li.price),
+      delta:0.5*(lo.delta+li.delta),
+      pDelta:0.5*(lo.pDelta+li.pDelta),
+      dGamma:0.5*(lo.dGamma+li.dGamma),
+      vega:0.5*(lo.vega+li.vega),
+      thetaM:0.5*(lo.thetaM+li.thetaM),
+      lo:lo, li:li
+    };
+    return {atm:atm,bar:bar};
+  }
+
+  var xs=[];for(var s=40;s<=190;s++)xs.push(s);
+  function atmPeakGamma(p){var m=0;xs.forEach(function(s){var g=leg(s,p.kAtm,p).dGamma;if(g>m)m=g;});return m||1;}
+
+  Chart.defaults.font.family="'IBM Plex Mono',monospace";
+  Chart.defaults.font.size=10;
+  Chart.defaults.color="#5b6675";
+  var spotVal=100, charts={};
+
+  var vline={id:'vl',afterDatasetsDraw:function(c){var x=c.scales.x.getPixelForValue(spotVal);var a=c.chartArea,ctx=c.ctx;ctx.save();ctx.strokeStyle='rgba(138,151,168,.5)';ctx.lineWidth=1;ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(x,a.top);ctx.lineTo(x,a.bottom);ctx.stroke();ctx.restore();}};
+
+  function ds(c,dash){return {data:[],borderColor:c,borderWidth:2,borderDash:dash,pointRadius:0,tension:.28,fill:false};}
+  function mk(id,yMin,yMax){
+    var opt={responsive:true,maintainAspectRatio:false,parsing:false,animation:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:false},tooltip:{enabled:true,backgroundColor:'#11161e',borderColor:'#2d3744',borderWidth:1,
+        callbacks:{title:function(it){return 'S = '+it[0].parsed.x;},
+          label:function(it){return (it.datasetIndex===0?'ATM':'Barbell')+': '+it.parsed.y.toFixed(2);}}}},
+      scales:{x:{type:'linear',min:40,max:190,grid:{color:'rgba(35,43,56,.7)'},ticks:{maxTicksLimit:8}},
+        y:{grid:{color:'rgba(35,43,56,.7)'},ticks:{maxTicksLimit:5}}}};
+    if(yMin!=null){opt.scales.y.min=yMin;opt.scales.y.max=yMax;}
+    return new Chart($(id),{type:'line',data:{datasets:[ds('#4493f8',[]),ds('#f0883e',[6,4])]},options:opt,plugins:[vline]});
+  }
+  charts.delta=mk('cDelta',0,1);
+  charts.gamma=mk('cGamma',0,null);
+  charts.vega=mk('cVega');
+  charts.theta=mk('cTheta');
+
+  function fillCards(p){
+    var b=books(spotVal,p), peak=atmPeakGamma(p);
+    var rows=[
+      ['Parité-Δ','0 → 1',b.atm.delta.toFixed(2),b.bar.delta.toFixed(2)],
+      ['Delta éco.','Δ × parité',b.atm.pDelta.toFixed(2),b.bar.pDelta.toFixed(2)],
+      ['Convexité','$gamma idx',Math.round(100*b.atm.dGamma/peak),Math.round(100*b.bar.dGamma/peak)],
+      ['Vega','pts / vol pt',b.atm.vega.toFixed(2),b.bar.vega.toFixed(2)],
+      ['Theta','pts / mois',b.atm.thetaM.toFixed(2),b.bar.thetaM.toFixed(2)]
+    ];
+    var h='';
+    rows.forEach(function(r){
+      h+='<div class="card atm"><div class="who">ATM</div><div class="k">'+r[0]+'</div><div class="v">'+r[2]+'</div><div class="u">'+r[1]+'</div></div>';
+    });
+    rows.forEach(function(r){
+      h+='<div class="card bar"><div class="who">BARBELL</div><div class="k">'+r[0]+'</div><div class="v">'+r[3]+'</div><div class="u">'+r[1]+'</div></div>';
+    });
+    $("cards").innerHTML=h;
+  }
+
+  function redraw(){
+    var p=P(), peak=atmPeakGamma(p);
+    var dA=[],dB=[],gA=[],gB=[],vA=[],vB=[],tA=[],tB=[];
+    xs.forEach(function(s){
+      var b=books(s,p);
+      dA.push({x:s,y:b.atm.delta}); dB.push({x:s,y:b.bar.delta});
+      gA.push({x:s,y:100*b.atm.dGamma/peak}); gB.push({x:s,y:100*b.bar.dGamma/peak});
+      vA.push({x:s,y:b.atm.vega}); vB.push({x:s,y:b.bar.vega});
+      tA.push({x:s,y:b.atm.thetaM}); tB.push({x:s,y:b.bar.thetaM});
+    });
+    charts.delta.data.datasets[0].data=dA; charts.delta.data.datasets[1].data=dB;
+    charts.gamma.data.datasets[0].data=gA; charts.gamma.data.datasets[1].data=gB;
+    charts.vega.data.datasets[0].data=vA;  charts.vega.data.datasets[1].data=vB;
+    charts.theta.data.datasets[0].data=tA; charts.theta.data.datasets[1].data=tB;
+    for(var k in charts)charts[k].update('none');
+    $("spotOut").textContent=spotVal;
+    fillCards(p);
+    runStress();
+  }
+
+  // ---- Stress panel ----
+  var eqShock=-0.20, spShock=0.0200;
+  var eqOpts=[[0,'flat'],[-0.10,'−10%'],[-0.20,'−20%'],[-0.35,'−35%']];
+  var spOpts=[[0,'+0'],[0.0100,'+100'],[0.0200,'+200'],[0.0400,'+400']];
+
+  function buildScn(){
+    $("scnEq").innerHTML=eqOpts.map(function(o,i){return '<button data-v="'+o[0]+'" class="'+(o[0]===eqShock?'on':'')+'">'+o[1]+'</button>';}).join('');
+    $("scnSp").innerHTML=spOpts.map(function(o){return '<button data-v="'+o[0]+'" class="'+(o[0]===spShock?'on':'')+'">'+o[1]+'</button>';}).join('');
+    $("scnEq").querySelectorAll('button').forEach(function(b){b.onclick=function(){eqShock=+b.dataset.v;buildScn();runStress();};});
+    $("scnSp").querySelectorAll('button').forEach(function(b){b.onclick=function(){spShock=+b.dataset.v;buildScn();runStress();};});
+  }
+
+  function pnlBook(name,cls,base,eqOnly,full){
+    var eqPnl=eqOnly-base, crPnl=full-eqOnly, tot=full-base;
+    var mx=Math.max(Math.abs(eqPnl),Math.abs(crPnl),0.01);
+    function bar(nm,v){
+      var w=Math.round(Math.abs(v)/mx*100), neg=v<0;
+      return '<div class="bl"><span class="nme">'+nm+'</span><div class="track">'+
+        '<span class="fill" style="width:'+w+'%;'+(neg?'right:50%;background:var(--neg)':'left:50%;background:var(--pos)')+'"></span></div>'+
+        '<span class="amt '+(neg?'neg':'pos')+'">'+(v>=0?'+':'')+v.toFixed(2)+'</span></div>';
+    }
+    return '<div class="pnlbook '+cls+'"><div class="h"><span class="nm">'+name+'</span>'+
+      '<span class="tot '+(tot<0?'neg':'pos')+'">'+(tot>=0?'+':'')+tot.toFixed(2)+' pts</span></div>'+
+      '<div class="bar2">'+bar('Equity',eqPnl)+bar('Crédit',crPnl)+'</div></div>';
+  }
+
+  function runStress(){
+    var p=P();
+    var base=books(S0,p);
+    var Sshk=S0*(1+eqShock);
+    var eqOnly=books(Sshk,p);                 // equity move, spread unchanged
+    var full=books(Sshk,p,p.cs+spShock);      // equity move + spread widening
+    $("pnlrow").innerHTML=
+      pnlBook('Book ATM','atm',base.atm.price,eqOnly.atm.price,full.atm.price)+
+      pnlBook('Barbell OTM+ITM','bar',base.bar.price,eqOnly.bar.price,full.bar.price);
+
+    var aTot=full.atm.price-base.atm.price, bTot=full.bar.price-base.bar.price;
+    var ivBase=ivFloor(p), ivStr=ivFloor(p,p.cs+spShock);
+    var floorDrop=(ivBase-ivStr).toFixed(1);
+    var msg;
+    if(spShock>0){
+      msg='Le spread s\u2019\u00e9carte de <b>+'+Math.round(spShock*10000)+' bps</b> : le bond floor recule de <b>'+floorDrop+' pts</b>. '+
+        'La jambe OTM busted du barbell est adoss\u00e9e \u00e0 ce floor \u2014 elle encaisse le choc cr\u00e9dit <b>en m\u00eame temps</b> que la baisse equity. '+
+        'C\u2019est l\u00e0 que la \u00ab double protection \u00bb devient illusoire : delta-floor et cr\u00e9dit-floor c\u00e8dent ensemble.';
+    } else {
+      msg='Sans \u00e9cartement de spread, le floor tient et le barbell amortit mieux les grands moves (sa convexit\u00e9 d\u2019aile se r\u00e9veille). Ajoute du spread pour voir la corr\u00e9lation cr\u00e9dit-equity jouer contre le book.';
+    }
+    $("stressNote").innerHTML=msg+' <span style="color:var(--dim)">[ATM '+(aTot>=0?'+':'')+aTot.toFixed(1)+' vs Barbell '+(bTot>=0?'+':'')+bTot.toFixed(1)+' pts]</span>';
+  }
+
+  function setFoot(){
+    $("foot").innerHTML='Mod\u00e8le : décomposition bond floor + call (Black-Scholes sur la composante action). '+
+      'CB = valeur d\u2019investissement [coupon + face actualis\u00e9s \u00e0 r+spread] + (100/Cp)·call(S,Cp). '+
+      'Parit\u00e9-delta = N(d1) ; $gamma = (100/Cp)·\u0393·S\u00b2 ; theta = loyer optionnel seul (le carry obligataire des busted, positif, s\u2019y ajoute hors graphe). '+
+      'Outil p\u00e9dagogique \u2014 ignore corr\u00e9lation cr\u00e9dit-equity intra-move, dividendes, soft-call et path-dependency. fixb/cb_pricer.';
+  }
+
+  function exportCsv(){
+    var p=P(), peak=atmPeakGamma(p), rows=[['spot','delta_atm','delta_bar','dgamma_idx_atm','dgamma_idx_bar','vega_atm','vega_bar','theta_atm','theta_bar']];
+    xs.forEach(function(s){var b=books(s,p);rows.push([s,b.atm.delta.toFixed(4),b.bar.delta.toFixed(4),
+      (100*b.atm.dGamma/peak).toFixed(2),(100*b.bar.dGamma/peak).toFixed(2),
+      b.atm.vega.toFixed(4),b.bar.vega.toFixed(4),b.atm.thetaM.toFixed(4),b.bar.thetaM.toFixed(4)]);});
+    var csv=rows.map(function(r){return r.join(',');}).join('\n');
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+    a.download='cb_portfolio_convexity_profiles.csv';a.click();
+  }
+
+  // ---- wire up ----
+  $("spot").addEventListener('input',function(e){spotVal=+e.target.value;redraw();});
+  ['sig','mat','rf','cs','cpn','kAtm','kOtm','kItm'].forEach(function(id){$(id).addEventListener('input',redraw);});
+  $("reset").onclick=function(){
+    var d={sig:30,mat:3,rf:3.5,cs:250,cpn:1.5,kAtm:100,kOtm:150,kItm:72};
+    for(var k in d)$(k).value=d[k];
+    spotVal=100;$("spot").value=100;eqShock=-0.20;spShock=0.0200;buildScn();redraw();
+  };
+  $("export").onclick=exportCsv;
+
+  buildScn();setFoot();redraw();
+})();
+</script>
+</body>
+</html>
