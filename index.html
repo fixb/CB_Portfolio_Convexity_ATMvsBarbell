@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CB Portfolio Convexity — ATM vs Barbell</title>
+<title>CB Portfolio Convexity — ATM / OTM / ITM / Blend</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -13,20 +13,22 @@
     --bg:#0b0e13; --panel:#11161e; --panel2:#161c26; --line:#232b38; --line2:#2d3744;
     --text:#e7eef6; --muted:#8a97a8; --dim:#5b6675;
     --atm:#4493f8; --atm-dim:#1c4f8f;
-    --bar:#f0883e; --bar-dim:#8a4d22;
+    --otm:#f0883e; --otm-dim:#8a4d22;
+    --itm:#a78bfa; --itm-dim:#5d4a8c;
+    --bld:#34d399; --bld-dim:#1a6b50;
     --pos:#3fb950; --neg:#f25555; --warn:#e3b341;
     --mono:'IBM Plex Mono',ui-monospace,monospace; --sans:'Manrope',system-ui,sans-serif;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.55;
     padding:28px 30px 60px;-webkit-font-smoothing:antialiased;
-    background-image:radial-gradient(circle at 18% -8%,rgba(68,147,248,.06),transparent 42%),radial-gradient(circle at 92% 4%,rgba(240,136,62,.05),transparent 40%);}
-  .wrap{max-width:1180px;margin:0 auto}
+    background-image:radial-gradient(circle at 14% -8%,rgba(68,147,248,.06),transparent 42%),radial-gradient(circle at 92% 4%,rgba(52,211,153,.05),transparent 40%);}
+  .wrap{max-width:1220px;margin:0 auto}
   header{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:18px;
     border-bottom:1px solid var(--line);padding-bottom:20px;margin-bottom:24px}
   h1{font-size:21px;font-weight:700;letter-spacing:-.01em}
-  h1 .accent{color:var(--bar)}
-  .sub{color:var(--muted);font-size:13px;margin-top:5px;max-width:640px}
+  h1 .accent{color:var(--bld)}
+  .sub{color:var(--muted);font-size:13px;margin-top:5px;max-width:680px}
   .spotbig{text-align:right;font-family:var(--mono)}
   .spotbig .lbl{color:var(--dim);font-size:11px;letter-spacing:.12em;text-transform:uppercase}
   .spotbig .val{font-size:34px;font-weight:600;line-height:1;color:var(--text)}
@@ -38,7 +40,7 @@
   .spotrow{display:flex;align-items:center;gap:16px;margin-bottom:6px}
   .spotrow label{font-family:var(--mono);font-size:12px;color:var(--muted);white-space:nowrap}
   input[type=range]{-webkit-appearance:none;appearance:none;height:5px;border-radius:5px;flex:1;
-    background:linear-gradient(90deg,var(--atm-dim),var(--bar-dim));outline:none}
+    background:linear-gradient(90deg,var(--atm-dim),var(--itm-dim),var(--otm-dim));outline:none}
   input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;
     background:var(--text);border:3px solid var(--bg);cursor:pointer;box-shadow:0 0 0 1px var(--line2)}
   input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--text);border:3px solid var(--bg);cursor:pointer}
@@ -49,10 +51,27 @@
   .pf input{background:var(--panel2);border:1px solid var(--line2);border-radius:7px;color:var(--text);
     font-family:var(--mono);font-size:13px;padding:8px 10px;width:100%}
   .pf input:focus{outline:none;border-color:var(--atm)}
-  .pf.barleg input:focus{border-color:var(--bar)}
+  .pf.otmleg input:focus{border-color:var(--otm)}
+  .pf.itmleg input:focus{border-color:var(--itm)}
   .pf .tag{font-size:9px;padding:1px 6px;border-radius:4px;letter-spacing:.06em;text-transform:uppercase}
   .tag-atm{background:var(--atm-dim);color:#bcd8fb}
-  .tag-bar{background:var(--bar-dim);color:#f6cfa9}
+  .tag-otm{background:var(--otm-dim);color:#f6cfa9}
+  .tag-itm{background:var(--itm-dim);color:#ddd2fb}
+  .tag-bld{background:var(--bld-dim);color:#b4ecd3}
+
+  .weights{display:grid;grid-template-columns:repeat(3,1fr) auto;gap:12px;align-items:end;margin-top:14px}
+  .wpf{display:flex;flex-direction:column;gap:6px}
+  .wpf .wh{display:flex;justify-content:space-between;align-items:baseline;font-family:var(--mono);font-size:11px}
+  .wpf .wh .nm{color:var(--dim);letter-spacing:.06em}
+  .wpf .wh .pct{color:var(--text);font-weight:600}
+  .wpf input[type=range]{height:4px}
+  .wpf.atm input[type=range]{background:linear-gradient(90deg,#0e1722,var(--atm))}
+  .wpf.otm input[type=range]{background:linear-gradient(90deg,#0e1722,var(--otm))}
+  .wpf.itm input[type=range]{background:linear-gradient(90deg,#0e1722,var(--itm))}
+  .wnorm{font-family:var(--mono);font-size:10.5px;color:var(--dim);text-align:right;white-space:nowrap;padding-bottom:4px}
+  .wnorm b{color:var(--bld);font-weight:600}
+  .wpresets{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+  .wpresets button{font-size:11px;padding:5px 10px}
 
   .actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
   button{font-family:var(--sans);font-size:12.5px;font-weight:600;padding:8px 15px;border-radius:7px;cursor:pointer;
@@ -60,41 +79,61 @@
   button:hover{border-color:var(--muted);background:#1d2531}
   button.ghost{background:transparent}
 
-  .legend{display:flex;gap:22px;margin:2px 0 18px;font-family:var(--mono);font-size:12px}
+  .legend{display:flex;gap:18px;margin:2px 0 18px;font-family:var(--mono);font-size:12px;flex-wrap:wrap}
   .legend span{display:flex;align-items:center;gap:7px;color:var(--muted)}
   .swatch{width:18px;height:3px;border-radius:2px;display:inline-block}
 
-  .cards{display:grid;grid-template-columns:repeat(5,1fr);gap:11px;margin-bottom:18px}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:12px 14px;position:relative;overflow:hidden}
-  .card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px}
-  .card.atm::before{background:var(--atm)} .card.bar::before{background:var(--bar)}
-  .card .k{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim)}
-  .card .who{font-size:9.5px;font-weight:700;letter-spacing:.05em}
-  .card.atm .who{color:var(--atm)} .card.bar .who{color:var(--bar)}
-  .card .v{font-family:var(--mono);font-size:22px;font-weight:600;margin-top:6px;letter-spacing:-.02em}
-  .card .u{font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-top:1px}
+  .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-bottom:18px}
+  .bookcard{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:13px 15px;position:relative;overflow:hidden}
+  .bookcard::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px}
+  .bookcard.atm::before{background:var(--atm)}
+  .bookcard.otm::before{background:var(--otm)}
+  .bookcard.itm::before{background:var(--itm)}
+  .bookcard.bld::before{background:var(--bld)}
+  .bookcard .head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:11px}
+  .bookcard .nm{font-size:11.5px;font-weight:700;letter-spacing:.07em}
+  .bookcard.atm .nm{color:var(--atm)}
+  .bookcard.otm .nm{color:var(--otm)}
+  .bookcard.itm .nm{color:var(--itm)}
+  .bookcard.bld .nm{color:var(--bld)}
+  .bookcard .sub2{font-family:var(--mono);font-size:9.5px;color:var(--dim);letter-spacing:.04em}
+  .stats{display:flex;flex-direction:column;gap:7px}
+  .stats .row{display:flex;justify-content:space-between;align-items:baseline;font-family:var(--mono);font-size:11.5px;
+    border-top:1px dashed var(--line);padding-top:6px}
+  .stats .row:first-child{border-top:none;padding-top:0}
+  .stats .row .lbl{color:var(--dim);font-size:10.5px;letter-spacing:.04em;text-transform:uppercase}
+  .stats .row .val{color:var(--text);font-weight:600;font-size:13.5px;letter-spacing:-.01em}
+  .stats .row .u{color:var(--dim);font-size:9.5px;margin-left:5px}
 
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
   .chartbox{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px 18px}
   .chartbox .ct{font-size:13px;font-weight:600;margin-bottom:2px}
   .chartbox .cs{font-family:var(--mono);font-size:11px;color:var(--dim);margin-bottom:12px}
-  .cv{position:relative;width:100%;height:210px}
+  .cv{position:relative;width:100%;height:220px}
 
-  .stress{display:grid;grid-template-columns:300px 1fr;gap:24px}
+  .stress{display:grid;grid-template-columns:280px 1fr;gap:20px}
   .stressctl{display:flex;flex-direction:column;gap:14px}
-  .scn{display:flex;gap:8px;flex-wrap:wrap}
-  .scn button{flex:1;min-width:70px}
-  .scn button.on{border-color:var(--bar);background:var(--bar-dim);color:#fbe3cd}
-  .pnlrow{display:flex;flex-direction:column;gap:14px}
-  .pnlbook{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
-  .pnlbook .h{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:11px}
-  .pnlbook .h .nm{font-weight:700;font-size:13px}
-  .pnlbook.atm .nm{color:var(--atm)} .pnlbook.bar .nm{color:var(--bar)}
-  .pnlbook .h .tot{font-family:var(--mono);font-size:20px;font-weight:600}
-  .bar2{display:flex;flex-direction:column;gap:8px}
-  .bl{display:grid;grid-template-columns:84px 1fr 62px;align-items:center;gap:10px;font-family:var(--mono);font-size:11.5px}
+  .scn{display:flex;gap:6px;flex-wrap:wrap}
+  .scn button{flex:1;min-width:62px;padding:7px 8px;font-size:11.5px}
+  .scn button.on{border-color:var(--bld);background:var(--bld-dim);color:#cdf3e0}
+  .pnlrow{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+  .pnlbook{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;position:relative;overflow:hidden}
+  .pnlbook::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px}
+  .pnlbook.atm::before{background:var(--atm)}
+  .pnlbook.otm::before{background:var(--otm)}
+  .pnlbook.itm::before{background:var(--itm)}
+  .pnlbook.bld::before{background:var(--bld)}
+  .pnlbook .h{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:9px}
+  .pnlbook .h .nm{font-weight:700;font-size:12px;letter-spacing:.05em}
+  .pnlbook.atm .nm{color:var(--atm)}
+  .pnlbook.otm .nm{color:var(--otm)}
+  .pnlbook.itm .nm{color:var(--itm)}
+  .pnlbook.bld .nm{color:var(--bld)}
+  .pnlbook .h .tot{font-family:var(--mono);font-size:16px;font-weight:600}
+  .bar2{display:flex;flex-direction:column;gap:6px}
+  .bl{display:grid;grid-template-columns:60px 1fr 54px;align-items:center;gap:8px;font-family:var(--mono);font-size:11px}
   .bl .nme{color:var(--muted)}
-  .track{height:9px;background:var(--bg);border-radius:5px;position:relative;overflow:hidden}
+  .track{height:8px;background:var(--bg);border-radius:5px;position:relative;overflow:hidden}
   .fill{position:absolute;top:0;bottom:0;border-radius:5px}
   .bl .amt{text-align:right}
   .note{background:rgba(227,179,65,.08);border:1px solid rgba(227,179,65,.28);border-radius:9px;
@@ -102,7 +141,7 @@
   .note b{color:var(--warn)}
   .pos{color:var(--pos)} .neg{color:var(--neg)}
   footer{margin-top:34px;padding-top:18px;border-top:1px solid var(--line);color:var(--dim);font-size:11.5px;font-family:var(--mono);line-height:1.7}
-  @media(max-width:860px){.cards{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}.stress{grid-template-columns:1fr}}
+  @media(max-width:980px){.cards{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}.stress{grid-template-columns:1fr}.weights{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -110,8 +149,8 @@
 
   <header>
     <div>
-      <h1>CB Portfolio Convexity <span class="accent">// ATM vs Barbell</span></h1>
-      <div class="sub">Comparaison de deux books de convertibles à delta voisin : un book <b>ATM</b> (convexité concentrée au spot) contre un <b>barbell OTM + ITM</b> (convexité réservée dans les ailes). Profils delta / $gamma / vega / theta recalculés en direct, plus un panneau de stress crédit-equity.</div>
+      <h1>CB Portfolio Convexity <span class="accent">// ATM · OTM · ITM · Blend</span></h1>
+      <div class="sub">Trois books de convertibles isolés (<b>ATM</b> au pivot, <b>OTM</b> busted dans l'aile haute, <b>ITM</b> deep dans l'aile basse) plus un <b>Blend</b> pondérable. Tous les profils delta / $gamma / vega / theta recalculés en direct, avec stress crédit-equity sur les quatre livres.</div>
     </div>
     <div class="spotbig"><div class="lbl">Sous-jacent</div><div class="val" id="spotOut">100</div></div>
   </header>
@@ -129,11 +168,38 @@
       <div class="pf"><label>Spread crédit (bps)</label><input id="cs" type="number" value="250" step="25"></div>
       <div class="pf"><label>Coupon (%)</label><input id="cpn" type="number" value="1.5" step="0.25"></div>
       <div class="pf"><label><span class="tag tag-atm">ATM</span> prix conv.</label><input id="kAtm" type="number" value="100" step="1"></div>
-      <div class="pf barleg"><label><span class="tag tag-bar">OTM</span> prix conv.</label><input id="kOtm" type="number" value="150" step="1"></div>
-      <div class="pf barleg"><label><span class="tag tag-bar">ITM</span> prix conv.</label><input id="kItm" type="number" value="72" step="1"></div>
+      <div class="pf otmleg"><label><span class="tag tag-otm">OTM</span> prix conv.</label><input id="kOtm" type="number" value="150" step="1"></div>
+      <div class="pf itmleg"><label><span class="tag tag-itm">ITM</span> prix conv.</label><input id="kItm" type="number" value="72" step="1"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Pondération du blend <span class="tag tag-bld" style="font-size:9px;padding:1px 6px;margin-left:6px;border-radius:4px">Blend</span></h2>
+    <div class="weights">
+      <div class="wpf atm">
+        <div class="wh"><span class="nm">ATM</span><span class="pct" id="wAtmPct">33%</span></div>
+        <input type="range" id="wAtm" min="0" max="100" value="33" step="1">
+      </div>
+      <div class="wpf otm">
+        <div class="wh"><span class="nm">OTM</span><span class="pct" id="wOtmPct">33%</span></div>
+        <input type="range" id="wOtm" min="0" max="100" value="33" step="1">
+      </div>
+      <div class="wpf itm">
+        <div class="wh"><span class="nm">ITM</span><span class="pct" id="wItmPct">34%</span></div>
+        <input type="range" id="wItm" min="0" max="100" value="34" step="1">
+      </div>
+      <div class="wnorm">Σ avant norm.: <b id="wRaw">100</b><br>Σ effective: <b>100%</b></div>
+    </div>
+    <div class="wpresets">
+      <button data-w="100,0,0">100% ATM</button>
+      <button data-w="0,50,50">Barbell 50/50</button>
+      <button data-w="0,100,0">100% OTM</button>
+      <button data-w="0,0,100">100% ITM</button>
+      <button data-w="33,33,34">Équipondéré</button>
+      <button data-w="50,25,25">ATM-tilté</button>
     </div>
     <div class="actions">
-      <button class="ghost" id="reset">↺ Réinitialiser</button>
+      <button class="ghost" id="reset">↺ Réinitialiser tout</button>
       <button id="export">⤓ Exporter les profils (CSV)</button>
     </div>
   </div>
@@ -141,8 +207,10 @@
   <div class="cards" id="cards"></div>
 
   <div class="legend">
-    <span><span class="swatch" style="background:var(--atm)"></span>Book ATM</span>
-    <span><span class="swatch" style="background:var(--bar)"></span>Barbell OTM + ITM</span>
+    <span><span class="swatch" style="background:var(--atm)"></span>ATM</span>
+    <span><span class="swatch" style="background:var(--otm)"></span>OTM (busted)</span>
+    <span><span class="swatch" style="background:var(--itm)"></span>ITM (deep)</span>
+    <span><span class="swatch" style="background:var(--bld);height:4px"></span>Blend pondéré</span>
     <span style="color:var(--dim)">— ligne pointillée = spot courant</span>
   </div>
 
@@ -154,7 +222,7 @@
   </div>
 
   <div class="panel">
-    <h2>Stress crédit-equity — quand la « double protection » lâche</h2>
+    <h2>Stress crédit-equity — décomposition par livre</h2>
     <div class="stress">
       <div class="stressctl">
         <div>
@@ -196,6 +264,15 @@
     };
   }
 
+  function W(){
+    var wA=Math.max(0,+$("wAtm").value);
+    var wO=Math.max(0,+$("wOtm").value);
+    var wI=Math.max(0,+$("wItm").value);
+    var s=wA+wO+wI;
+    if(s<=0) return {a:0,o:0,i:0,raw:0};
+    return {a:wA/s, o:wO/s, i:wI/s, raw:s};
+  }
+
   function bs(S,K,p){
     var v=p.sig*Math.sqrt(p.T);
     var d1=(Math.log(S/K)+(p.r+p.sig*p.sig/2)*p.T)/v;
@@ -231,42 +308,69 @@
     };
   }
 
+  function blendOf(atm,otm,itm,w){
+    return {
+      price:w.a*atm.price+w.o*otm.price+w.i*itm.price,
+      delta:w.a*atm.delta+w.o*otm.delta+w.i*itm.delta,
+      pDelta:w.a*atm.pDelta+w.o*otm.pDelta+w.i*itm.pDelta,
+      dGamma:w.a*atm.dGamma+w.o*otm.dGamma+w.i*itm.dGamma,
+      vega:w.a*atm.vega+w.o*otm.vega+w.i*itm.vega,
+      thetaM:w.a*atm.thetaM+w.o*otm.thetaM+w.i*itm.thetaM
+    };
+  }
+
   function books(S,p,csOverride){
     var atm=leg(S,p.kAtm,p,csOverride);
-    var lo=leg(S,p.kOtm,p,csOverride), li=leg(S,p.kItm,p,csOverride);
-    var bar={
-      price:0.5*(lo.price+li.price),
-      delta:0.5*(lo.delta+li.delta),
-      pDelta:0.5*(lo.pDelta+li.pDelta),
-      dGamma:0.5*(lo.dGamma+li.dGamma),
-      vega:0.5*(lo.vega+li.vega),
-      thetaM:0.5*(lo.thetaM+li.thetaM),
-      lo:lo, li:li
-    };
-    return {atm:atm,bar:bar};
+    var otm=leg(S,p.kOtm,p,csOverride);
+    var itm=leg(S,p.kItm,p,csOverride);
+    var bld=blendOf(atm,otm,itm,W());
+    return {atm:atm,otm:otm,itm:itm,bld:bld};
   }
 
   var xs=[];for(var s=40;s<=190;s++)xs.push(s);
-  function atmPeakGamma(p){var m=0;xs.forEach(function(s){var g=leg(s,p.kAtm,p).dGamma;if(g>m)m=g;});return m||1;}
+  function peakRefGamma(p){
+    var m=0;
+    xs.forEach(function(s){
+      var g=leg(s,p.kAtm,p).dGamma;
+      if(g>m)m=g;
+    });
+    return m||1;
+  }
 
   Chart.defaults.font.family="'IBM Plex Mono',monospace";
   Chart.defaults.font.size=10;
   Chart.defaults.color="#5b6675";
   var spotVal=100, charts={};
 
-  var vline={id:'vl',afterDatasetsDraw:function(c){var x=c.scales.x.getPixelForValue(spotVal);var a=c.chartArea,ctx=c.ctx;ctx.save();ctx.strokeStyle='rgba(138,151,168,.5)';ctx.lineWidth=1;ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(x,a.top);ctx.lineTo(x,a.bottom);ctx.stroke();ctx.restore();}};
+  var vline={id:'vl',afterDatasetsDraw:function(c){var x=c.scales.x.getPixelForValue(spotVal);var a=c.chartArea,ctx=c.ctx;ctx.save();ctx.strokeStyle='rgba(138,151,168,.55)';ctx.lineWidth=1;ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(x,a.top);ctx.lineTo(x,a.bottom);ctx.stroke();ctx.restore();}};
 
-  function ds(c,dash){return {data:[],borderColor:c,borderWidth:2,borderDash:dash,pointRadius:0,tension:.28,fill:false};}
+  var BOOK_KEYS=['atm','otm','itm','bld'];
+  var BOOK_LABEL={atm:'ATM',otm:'OTM',itm:'ITM',bld:'Blend'};
+  var BOOK_COLOR={atm:'#4493f8',otm:'#f0883e',itm:'#a78bfa',bld:'#34d399'};
+
+  function ds(key){
+    var isBlend=(key==='bld');
+    return {
+      label:BOOK_LABEL[key],
+      data:[],
+      borderColor:BOOK_COLOR[key],
+      borderWidth:isBlend?2.6:1.8,
+      borderDash:isBlend?[7,3]:[],
+      pointRadius:0,
+      tension:.28,
+      fill:false
+    };
+  }
   function mk(id,yMin,yMax){
     var opt={responsive:true,maintainAspectRatio:false,parsing:false,animation:false,
       interaction:{mode:'index',intersect:false},
       plugins:{legend:{display:false},tooltip:{enabled:true,backgroundColor:'#11161e',borderColor:'#2d3744',borderWidth:1,
         callbacks:{title:function(it){return 'S = '+it[0].parsed.x;},
-          label:function(it){return (it.datasetIndex===0?'ATM':'Barbell')+': '+it.parsed.y.toFixed(2);}}}},
+          label:function(it){return BOOK_LABEL[BOOK_KEYS[it.datasetIndex]]+': '+it.parsed.y.toFixed(2);}}}},
       scales:{x:{type:'linear',min:40,max:190,grid:{color:'rgba(35,43,56,.7)'},ticks:{maxTicksLimit:8}},
         y:{grid:{color:'rgba(35,43,56,.7)'},ticks:{maxTicksLimit:5}}}};
     if(yMin!=null){opt.scales.y.min=yMin;opt.scales.y.max=yMax;}
-    return new Chart($(id),{type:'line',data:{datasets:[ds('#4493f8',[]),ds('#f0883e',[6,4])]},options:opt,plugins:[vline]});
+    return new Chart($(id),{type:'line',data:{datasets:BOOK_KEYS.map(ds)},options:opt,plugins:[vline]});
   }
   charts.delta=mk('cDelta',0,1);
   charts.gamma=mk('cGamma',0,null);
@@ -274,42 +378,65 @@
   charts.theta=mk('cTheta');
 
   function fillCards(p){
-    var b=books(spotVal,p), peak=atmPeakGamma(p);
-    var rows=[
-      ['Parité-Δ','0 → 1',b.atm.delta.toFixed(2),b.bar.delta.toFixed(2)],
-      ['Delta éco.','Δ × parité',b.atm.pDelta.toFixed(2),b.bar.pDelta.toFixed(2)],
-      ['Convexité','$gamma idx',Math.round(100*b.atm.dGamma/peak),Math.round(100*b.bar.dGamma/peak)],
-      ['Vega','pts / vol pt',b.atm.vega.toFixed(2),b.bar.vega.toFixed(2)],
-      ['Theta','pts / mois',b.atm.thetaM.toFixed(2),b.bar.thetaM.toFixed(2)]
-    ];
+    var b=books(spotVal,p), peak=peakRefGamma(p), w=W();
+    var subOf={
+      atm:'K = '+p.kAtm,
+      otm:'K = '+p.kOtm+' (busted)',
+      itm:'K = '+p.kItm+' (deep)',
+      bld:Math.round(w.a*100)+' / '+Math.round(w.o*100)+' / '+Math.round(w.i*100)
+    };
     var h='';
-    rows.forEach(function(r){
-      h+='<div class="card atm"><div class="who">ATM</div><div class="k">'+r[0]+'</div><div class="v">'+r[2]+'</div><div class="u">'+r[1]+'</div></div>';
-    });
-    rows.forEach(function(r){
-      h+='<div class="card bar"><div class="who">BARBELL</div><div class="k">'+r[0]+'</div><div class="v">'+r[3]+'</div><div class="u">'+r[1]+'</div></div>';
+    BOOK_KEYS.forEach(function(k){
+      var bk=b[k];
+      h+='<div class="bookcard '+k+'">'+
+        '<div class="head"><span class="nm">'+BOOK_LABEL[k].toUpperCase()+'</span><span class="sub2">'+subOf[k]+'</span></div>'+
+        '<div class="stats">'+
+          '<div class="row"><span class="lbl">Prix</span><span class="val">'+bk.price.toFixed(1)+'<span class="u">pts</span></span></div>'+
+          '<div class="row"><span class="lbl">Parité Δ</span><span class="val">'+bk.delta.toFixed(2)+'</span></div>'+
+          '<div class="row"><span class="lbl">Delta éco.</span><span class="val">'+bk.pDelta.toFixed(2)+'</span></div>'+
+          '<div class="row"><span class="lbl">$ gamma</span><span class="val">'+Math.round(100*bk.dGamma/peak)+'<span class="u">idx</span></span></div>'+
+          '<div class="row"><span class="lbl">Vega</span><span class="val">'+bk.vega.toFixed(2)+'</span></div>'+
+          '<div class="row"><span class="lbl">Theta</span><span class="val">'+bk.thetaM.toFixed(2)+'<span class="u">/m</span></span></div>'+
+        '</div></div>';
     });
     $("cards").innerHTML=h;
   }
 
   function redraw(){
-    var p=P(), peak=atmPeakGamma(p);
-    var dA=[],dB=[],gA=[],gB=[],vA=[],vB=[],tA=[],tB=[];
+    var p=P(), peak=peakRefGamma(p);
+    var seriesD={atm:[],otm:[],itm:[],bld:[]};
+    var seriesG={atm:[],otm:[],itm:[],bld:[]};
+    var seriesV={atm:[],otm:[],itm:[],bld:[]};
+    var seriesT={atm:[],otm:[],itm:[],bld:[]};
     xs.forEach(function(s){
       var b=books(s,p);
-      dA.push({x:s,y:b.atm.delta}); dB.push({x:s,y:b.bar.delta});
-      gA.push({x:s,y:100*b.atm.dGamma/peak}); gB.push({x:s,y:100*b.bar.dGamma/peak});
-      vA.push({x:s,y:b.atm.vega}); vB.push({x:s,y:b.bar.vega});
-      tA.push({x:s,y:b.atm.thetaM}); tB.push({x:s,y:b.bar.thetaM});
+      BOOK_KEYS.forEach(function(k){
+        seriesD[k].push({x:s,y:b[k].delta});
+        seriesG[k].push({x:s,y:100*b[k].dGamma/peak});
+        seriesV[k].push({x:s,y:b[k].vega});
+        seriesT[k].push({x:s,y:b[k].thetaM});
+      });
     });
-    charts.delta.data.datasets[0].data=dA; charts.delta.data.datasets[1].data=dB;
-    charts.gamma.data.datasets[0].data=gA; charts.gamma.data.datasets[1].data=gB;
-    charts.vega.data.datasets[0].data=vA;  charts.vega.data.datasets[1].data=vB;
-    charts.theta.data.datasets[0].data=tA; charts.theta.data.datasets[1].data=tB;
-    for(var k in charts)charts[k].update('none');
+    BOOK_KEYS.forEach(function(k,i){
+      charts.delta.data.datasets[i].data=seriesD[k];
+      charts.gamma.data.datasets[i].data=seriesG[k];
+      charts.vega.data.datasets[i].data=seriesV[k];
+      charts.theta.data.datasets[i].data=seriesT[k];
+    });
+    for(var c in charts)charts[c].update('none');
     $("spotOut").textContent=spotVal;
+    refreshWeightUI();
     fillCards(p);
     runStress();
+  }
+
+  function refreshWeightUI(){
+    var raw=Math.max(0,+$("wAtm").value)+Math.max(0,+$("wOtm").value)+Math.max(0,+$("wItm").value);
+    var w=W();
+    $("wAtmPct").textContent=Math.round(w.a*100)+'%';
+    $("wOtmPct").textContent=Math.round(w.o*100)+'%';
+    $("wItmPct").textContent=Math.round(w.i*100)+'%';
+    $("wRaw").textContent=raw;
   }
 
   // ---- Stress panel ----
@@ -318,7 +445,7 @@
   var spOpts=[[0,'+0'],[0.0100,'+100'],[0.0200,'+200'],[0.0400,'+400']];
 
   function buildScn(){
-    $("scnEq").innerHTML=eqOpts.map(function(o,i){return '<button data-v="'+o[0]+'" class="'+(o[0]===eqShock?'on':'')+'">'+o[1]+'</button>';}).join('');
+    $("scnEq").innerHTML=eqOpts.map(function(o){return '<button data-v="'+o[0]+'" class="'+(o[0]===eqShock?'on':'')+'">'+o[1]+'</button>';}).join('');
     $("scnSp").innerHTML=spOpts.map(function(o){return '<button data-v="'+o[0]+'" class="'+(o[0]===spShock?'on':'')+'">'+o[1]+'</button>';}).join('');
     $("scnEq").querySelectorAll('button').forEach(function(b){b.onclick=function(){eqShock=+b.dataset.v;buildScn();runStress();};});
     $("scnSp").querySelectorAll('button').forEach(function(b){b.onclick=function(){spShock=+b.dataset.v;buildScn();runStress();};});
@@ -334,7 +461,7 @@
         '<span class="amt '+(neg?'neg':'pos')+'">'+(v>=0?'+':'')+v.toFixed(2)+'</span></div>';
     }
     return '<div class="pnlbook '+cls+'"><div class="h"><span class="nm">'+name+'</span>'+
-      '<span class="tot '+(tot<0?'neg':'pos')+'">'+(tot>=0?'+':'')+tot.toFixed(2)+' pts</span></div>'+
+      '<span class="tot '+(tot<0?'neg':'pos')+'">'+(tot>=0?'+':'')+tot.toFixed(2)+'</span></div>'+
       '<div class="bar2">'+bar('Equity',eqPnl)+bar('Crédit',crPnl)+'</div></div>';
   }
 
@@ -342,38 +469,56 @@
     var p=P();
     var base=books(S0,p);
     var Sshk=S0*(1+eqShock);
-    var eqOnly=books(Sshk,p);                 // equity move, spread unchanged
-    var full=books(Sshk,p,p.cs+spShock);      // equity move + spread widening
+    var eqOnly=books(Sshk,p);
+    var full=books(Sshk,p,p.cs+spShock);
     $("pnlrow").innerHTML=
-      pnlBook('Book ATM','atm',base.atm.price,eqOnly.atm.price,full.atm.price)+
-      pnlBook('Barbell OTM+ITM','bar',base.bar.price,eqOnly.bar.price,full.bar.price);
+      pnlBook('ATM','atm',base.atm.price,eqOnly.atm.price,full.atm.price)+
+      pnlBook('OTM','otm',base.otm.price,eqOnly.otm.price,full.otm.price)+
+      pnlBook('ITM','itm',base.itm.price,eqOnly.itm.price,full.itm.price)+
+      pnlBook('Blend','bld',base.bld.price,eqOnly.bld.price,full.bld.price);
 
-    var aTot=full.atm.price-base.atm.price, bTot=full.bar.price-base.bar.price;
     var ivBase=ivFloor(p), ivStr=ivFloor(p,p.cs+spShock);
     var floorDrop=(ivBase-ivStr).toFixed(1);
+    var totals=BOOK_KEYS.map(function(k){return {k:k,t:full[k].price-base[k].price};});
+    var worst=totals.reduce(function(a,b){return b.t<a.t?b:a;});
+    var best=totals.reduce(function(a,b){return b.t>a.t?b:a;});
     var msg;
     if(spShock>0){
-      msg='Le spread s\u2019\u00e9carte de <b>+'+Math.round(spShock*10000)+' bps</b> : le bond floor recule de <b>'+floorDrop+' pts</b>. '+
-        'La jambe OTM busted du barbell est adoss\u00e9e \u00e0 ce floor \u2014 elle encaisse le choc cr\u00e9dit <b>en m\u00eame temps</b> que la baisse equity. '+
-        'C\u2019est l\u00e0 que la \u00ab double protection \u00bb devient illusoire : delta-floor et cr\u00e9dit-floor c\u00e8dent ensemble.';
+      msg='Spread <b>+'+Math.round(spShock*10000)+' bps</b> : bond floor recule de <b>'+floorDrop+' pts</b>. '+
+        'L’<b>OTM busted</b> est adossé au floor (peu de delta pour amortir), il prend de plein fouet la corrélation crédit-equity. '+
+        'L’<b>ITM deep</b> souffre surtout du choc actions, peu du crédit. L’<b>ATM</b> est entre les deux. Le <b>Blend</b> hérite mécaniquement de la pondération que tu as fixée.';
     } else {
-      msg='Sans \u00e9cartement de spread, le floor tient et le barbell amortit mieux les grands moves (sa convexit\u00e9 d\u2019aile se r\u00e9veille). Ajoute du spread pour voir la corr\u00e9lation cr\u00e9dit-equity jouer contre le book.';
+      msg='Sans écartement de spread, le floor tient. L’<b>OTM busted</b> bénéficie de la protection crédit, l’<b>ITM deep</b> suit l’action. Augmente le spread pour voir la corrélation crédit-equity casser la « double protection » de la jambe OTM.';
     }
-    $("stressNote").innerHTML=msg+' <span style="color:var(--dim)">[ATM '+(aTot>=0?'+':'')+aTot.toFixed(1)+' vs Barbell '+(bTot>=0?'+':'')+bTot.toFixed(1)+' pts]</span>';
+    msg+=' <span style="color:var(--dim)">[pire : '+BOOK_LABEL[worst.k]+' '+worst.t.toFixed(1)+' · meilleur : '+BOOK_LABEL[best.k]+' '+(best.t>=0?'+':'')+best.t.toFixed(1)+' pts]</span>';
+    $("stressNote").innerHTML=msg;
   }
 
   function setFoot(){
-    $("foot").innerHTML='Mod\u00e8le : décomposition bond floor + call (Black-Scholes sur la composante action). '+
-      'CB = valeur d\u2019investissement [coupon + face actualis\u00e9s \u00e0 r+spread] + (100/Cp)·call(S,Cp). '+
-      'Parit\u00e9-delta = N(d1) ; $gamma = (100/Cp)·\u0393·S\u00b2 ; theta = loyer optionnel seul (le carry obligataire des busted, positif, s\u2019y ajoute hors graphe). '+
-      'Outil p\u00e9dagogique \u2014 ignore corr\u00e9lation cr\u00e9dit-equity intra-move, dividendes, soft-call et path-dependency. fixb/cb_pricer.';
+    $("foot").innerHTML='Modèle : décomposition bond floor + call (Black-Scholes sur la composante action). '+
+      'CB = valeur d’investissement [coupon + face actualisés à r+spread] + (100/Cp)·call(S,Cp). '+
+      'Parité-delta = N(d1) ; $gamma = (100/Cp)·Γ·S² ; theta = loyer optionnel seul (le carry obligataire des busted, positif, s’y ajoute hors graphe). '+
+      'Blend = combinaison linéaire des trois livres aux poids normalisés. '+
+      'Outil pédagogique — ignore corrélation crédit-equity intra-move, dividendes, soft-call et path-dependency. fixb/cb_pricer.';
   }
 
   function exportCsv(){
-    var p=P(), peak=atmPeakGamma(p), rows=[['spot','delta_atm','delta_bar','dgamma_idx_atm','dgamma_idx_bar','vega_atm','vega_bar','theta_atm','theta_bar']];
-    xs.forEach(function(s){var b=books(s,p);rows.push([s,b.atm.delta.toFixed(4),b.bar.delta.toFixed(4),
-      (100*b.atm.dGamma/peak).toFixed(2),(100*b.bar.dGamma/peak).toFixed(2),
-      b.atm.vega.toFixed(4),b.bar.vega.toFixed(4),b.atm.thetaM.toFixed(4),b.bar.thetaM.toFixed(4)]);});
+    var p=P(), peak=peakRefGamma(p);
+    var rows=[['spot',
+      'delta_atm','delta_otm','delta_itm','delta_bld',
+      'dgamma_idx_atm','dgamma_idx_otm','dgamma_idx_itm','dgamma_idx_bld',
+      'vega_atm','vega_otm','vega_itm','vega_bld',
+      'theta_atm','theta_otm','theta_itm','theta_bld',
+      'price_atm','price_otm','price_itm','price_bld']];
+    xs.forEach(function(s){
+      var b=books(s,p);
+      rows.push([s,
+        b.atm.delta.toFixed(4),b.otm.delta.toFixed(4),b.itm.delta.toFixed(4),b.bld.delta.toFixed(4),
+        (100*b.atm.dGamma/peak).toFixed(2),(100*b.otm.dGamma/peak).toFixed(2),(100*b.itm.dGamma/peak).toFixed(2),(100*b.bld.dGamma/peak).toFixed(2),
+        b.atm.vega.toFixed(4),b.otm.vega.toFixed(4),b.itm.vega.toFixed(4),b.bld.vega.toFixed(4),
+        b.atm.thetaM.toFixed(4),b.otm.thetaM.toFixed(4),b.itm.thetaM.toFixed(4),b.bld.thetaM.toFixed(4),
+        b.atm.price.toFixed(3),b.otm.price.toFixed(3),b.itm.price.toFixed(3),b.bld.price.toFixed(3)]);
+    });
     var csv=rows.map(function(r){return r.join(',');}).join('\n');
     var a=document.createElement('a');
     a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
@@ -382,9 +527,18 @@
 
   // ---- wire up ----
   $("spot").addEventListener('input',function(e){spotVal=+e.target.value;redraw();});
-  ['sig','mat','rf','cs','cpn','kAtm','kOtm','kItm'].forEach(function(id){$(id).addEventListener('input',redraw);});
+  ['sig','mat','rf','cs','cpn','kAtm','kOtm','kItm','wAtm','wOtm','wItm'].forEach(function(id){
+    $(id).addEventListener('input',redraw);
+  });
+  document.querySelectorAll('.wpresets button').forEach(function(b){
+    b.onclick=function(){
+      var parts=b.dataset.w.split(',');
+      $("wAtm").value=parts[0]; $("wOtm").value=parts[1]; $("wItm").value=parts[2];
+      redraw();
+    };
+  });
   $("reset").onclick=function(){
-    var d={sig:30,mat:3,rf:3.5,cs:250,cpn:1.5,kAtm:100,kOtm:150,kItm:72};
+    var d={sig:30,mat:3,rf:3.5,cs:250,cpn:1.5,kAtm:100,kOtm:150,kItm:72,wAtm:33,wOtm:33,wItm:34};
     for(var k in d)$(k).value=d[k];
     spotVal=100;$("spot").value=100;eqShock=-0.20;spShock=0.0200;buildScn();redraw();
   };
