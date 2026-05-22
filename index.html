@@ -72,6 +72,9 @@
   .wnorm b{color:var(--bld);font-weight:600}
   .wpresets{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
   .wpresets button{font-size:11px;padding:5px 10px}
+  .hints{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}
+  .hint{font-family:var(--mono);font-size:10.5px;color:var(--muted);padding:4px 9px;border:1px solid var(--line2);border-radius:5px;cursor:pointer;transition:.12s;background:var(--panel2)}
+  .hint:hover{border-color:var(--bld);color:var(--text)}
 
   .actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
   button{font-family:var(--sans);font-size:12.5px;font-weight:600;padding:8px 15px;border-radius:7px;cursor:pointer;
@@ -170,6 +173,16 @@
       <div class="pf"><label><span class="tag tag-atm">ATM</span> prix conv.</label><input id="kAtm" type="number" value="100" step="1"></div>
       <div class="pf otmleg"><label><span class="tag tag-otm">OTM</span> prix conv.</label><input id="kOtm" type="number" value="150" step="1"></div>
       <div class="pf itmleg"><label><span class="tag tag-itm">ITM</span> prix conv.</label><input id="kItm" type="number" value="72" step="1"></div>
+      <div class="pf"><label>β crédit-equity (bps · ↓1%)</label><input id="beta" type="number" value="0" step="1" min="0"></div>
+      <div class="pf"><label>Dispersion δ (%)</label><input id="disp" type="number" value="0" step="5" min="0" max="100"></div>
+    </div>
+    <div class="hints">
+      <span class="hint" data-beta="0" data-disp="0">Indépendance · pas de dispersion</span>
+      <span class="hint" data-beta="4" data-disp="0">IG (β=4)</span>
+      <span class="hint" data-beta="10" data-disp="0">HY (β=10)</span>
+      <span class="hint" data-beta="20" data-disp="0">Distressed (β=20)</span>
+      <span class="hint" data-beta="0" data-disp="25">Panier sector (δ=25%)</span>
+      <span class="hint" data-beta="10" data-disp="40">HY single-names (β=10, δ=40%)</span>
     </div>
   </div>
 
@@ -221,6 +234,8 @@
     <div class="chartbox"><div class="ct">Theta optionnel</div><div class="cs">loyer du gamma — points par mois</div><div class="cv"><canvas id="cTheta"></canvas></div></div>
   </div>
 
+  <div class="chartbox" style="margin-bottom:18px"><div class="ct">Profil de prix CB &amp; bond floor</div><div class="cs">prix complet vs spot (points) — le floor pointillé courbe sous l'effet de β · l'écart price-floor révèle l'optionnalité</div><div class="cv" style="height:260px"><canvas id="cPrice"></canvas></div></div>
+
   <div class="panel">
     <h2>Stress crédit-equity — décomposition par livre</h2>
     <div class="stress">
@@ -260,8 +275,39 @@
       r:(+$("rf").value)/100,
       cs:(+$("cs").value)/10000,
       cpn:(+$("cpn").value)/100,
-      kAtm:+$("kAtm").value, kOtm:+$("kOtm").value, kItm:+$("kItm").value
+      kAtm:+$("kAtm").value, kOtm:+$("kOtm").value, kItm:+$("kItm").value,
+      beta:Math.max(0,+$("beta").value),
+      disp:Math.max(0,Math.min(100,+$("disp").value))/100
     };
+  }
+
+  // Probabilist Gauss-Hermite N=5 (∫ φ(z) f(z) dz)
+  var GH=[
+    {z:-2.85697001387281, w:0.0112574113277207},
+    {z:-1.35562617997427, w:0.222075922005613},
+    {z: 0.0,              w:0.533333333333333},
+    {z: 1.35562617997427, w:0.222075922005613},
+    {z: 2.85697001387281, w:0.0112574113277207}
+  ];
+
+  function csEff(S,p,baseCsOverride){
+    var basecs=(baseCsOverride==null)?p.cs:baseCsOverride;
+    if(!p.beta||p.beta<=0) return basecs;
+    return basecs+(p.beta/100)*Math.max(0,(S0-S)/S0);
+  }
+
+  function floorAt(S,p){
+    var d=p.disp;
+    if(d<=0.005) return ivFloor(p,csEff(S,p));
+    var sd_t=p.sig*d*Math.sqrt(p.T);
+    var var_adj=(p.sig*d)*(p.sig*d)*p.T/2;
+    var sum=0;
+    for(var i=0;i<GH.length;i++){
+      var q=GH[i];
+      var S_i=S*Math.exp(sd_t*q.z-var_adj);
+      sum+=q.w*ivFloor(p,csEff(S_i,p));
+    }
+    return sum;
   }
 
   function W(){
@@ -308,6 +354,32 @@
     };
   }
 
+  function legDispersed(S,K,p,baseCsOverride){
+    var d=p.disp;
+    if(d<=0.005){
+      var cs_e=csEff(S,p,baseCsOverride);
+      return leg(S,K,p,cs_e);
+    }
+    var sd_t=p.sig*d*Math.sqrt(p.T);
+    var var_adj=(p.sig*d)*(p.sig*d)*p.T/2;
+    var acc={price:0,delta:0,pDelta:0,dGamma:0,vega:0,thetaM:0,iv:0};
+    for(var i=0;i<GH.length;i++){
+      var q=GH[i];
+      var S_i=S*Math.exp(sd_t*q.z-var_adj);
+      var cs_e=csEff(S_i,p,baseCsOverride);
+      var l=leg(S_i,K,p,cs_e);
+      var sratio=S_i/S;
+      acc.price+=q.w*l.price;
+      acc.delta+=q.w*l.delta;
+      acc.pDelta+=q.w*l.pDelta*sratio;
+      acc.dGamma+=q.w*l.dGamma;
+      acc.vega+=q.w*l.vega;
+      acc.thetaM+=q.w*l.thetaM;
+      acc.iv+=q.w*l.iv;
+    }
+    return acc;
+  }
+
   function blendOf(atm,otm,itm,w){
     return {
       price:w.a*atm.price+w.o*otm.price+w.i*itm.price,
@@ -320,9 +392,9 @@
   }
 
   function books(S,p,csOverride){
-    var atm=leg(S,p.kAtm,p,csOverride);
-    var otm=leg(S,p.kOtm,p,csOverride);
-    var itm=leg(S,p.kItm,p,csOverride);
+    var atm=legDispersed(S,p.kAtm,p,csOverride);
+    var otm=legDispersed(S,p.kOtm,p,csOverride);
+    var itm=legDispersed(S,p.kItm,p,csOverride);
     var bld=blendOf(atm,otm,itm,W());
     return {atm:atm,otm:otm,itm:itm,bld:bld};
   }
@@ -330,8 +402,9 @@
   var xs=[];for(var s=40;s<=190;s++)xs.push(s);
   function peakRefGamma(p){
     var m=0;
+    var pNoDisp={sig:p.sig,T:p.T,r:p.r,cs:p.cs,cpn:p.cpn,kAtm:p.kAtm,kOtm:p.kOtm,kItm:p.kItm,beta:0,disp:0};
     xs.forEach(function(s){
-      var g=leg(s,p.kAtm,p).dGamma;
+      var g=leg(s,p.kAtm,pNoDisp).dGamma;
       if(g>m)m=g;
     });
     return m||1;
@@ -377,6 +450,20 @@
   charts.vega=mk('cVega');
   charts.theta=mk('cTheta');
 
+  function mkPrice(id){
+    var datasets=BOOK_KEYS.map(ds);
+    datasets.push({label:'Floor',data:[],borderColor:'#8a97a8',borderWidth:1.2,borderDash:[3,3],pointRadius:0,tension:.2,fill:false});
+    var opt={responsive:true,maintainAspectRatio:false,parsing:false,animation:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:false},tooltip:{enabled:true,backgroundColor:'#11161e',borderColor:'#2d3744',borderWidth:1,
+        callbacks:{title:function(it){return 'S = '+it[0].parsed.x;},
+          label:function(it){var i=it.datasetIndex;var lab=i<4?BOOK_LABEL[BOOK_KEYS[i]]:'Floor';return lab+': '+it.parsed.y.toFixed(1);}}}},
+      scales:{x:{type:'linear',min:40,max:190,grid:{color:'rgba(35,43,56,.7)'},ticks:{maxTicksLimit:8}},
+        y:{grid:{color:'rgba(35,43,56,.7)'},ticks:{maxTicksLimit:6}}}};
+    return new Chart($(id),{type:'line',data:{datasets:datasets},options:opt,plugins:[vline]});
+  }
+  charts.price=mkPrice('cPrice');
+
   function fillCards(p){
     var b=books(spotVal,p), peak=peakRefGamma(p), w=W();
     var subOf={
@@ -408,6 +495,8 @@
     var seriesG={atm:[],otm:[],itm:[],bld:[]};
     var seriesV={atm:[],otm:[],itm:[],bld:[]};
     var seriesT={atm:[],otm:[],itm:[],bld:[]};
+    var seriesP={atm:[],otm:[],itm:[],bld:[]};
+    var floorSeries=[];
     xs.forEach(function(s){
       var b=books(s,p);
       BOOK_KEYS.forEach(function(k){
@@ -415,14 +504,18 @@
         seriesG[k].push({x:s,y:100*b[k].dGamma/peak});
         seriesV[k].push({x:s,y:b[k].vega});
         seriesT[k].push({x:s,y:b[k].thetaM});
+        seriesP[k].push({x:s,y:b[k].price});
       });
+      floorSeries.push({x:s,y:floorAt(s,p)});
     });
     BOOK_KEYS.forEach(function(k,i){
       charts.delta.data.datasets[i].data=seriesD[k];
       charts.gamma.data.datasets[i].data=seriesG[k];
       charts.vega.data.datasets[i].data=seriesV[k];
       charts.theta.data.datasets[i].data=seriesT[k];
+      charts.price.data.datasets[i].data=seriesP[k];
     });
+    charts.price.data.datasets[4].data=floorSeries;
     for(var c in charts)charts[c].update('none');
     $("spotOut").textContent=spotVal;
     refreshWeightUI();
@@ -477,18 +570,27 @@
       pnlBook('ITM','itm',base.itm.price,eqOnly.itm.price,full.itm.price)+
       pnlBook('Blend','bld',base.bld.price,eqOnly.bld.price,full.bld.price);
 
-    var ivBase=ivFloor(p), ivStr=ivFloor(p,p.cs+spShock);
+    var ivBase=floorAt(S0,p), ivStr=floorAt(Sshk,{sig:p.sig,T:p.T,r:p.r,cs:p.cs+spShock,cpn:p.cpn,kAtm:p.kAtm,kOtm:p.kOtm,kItm:p.kItm,beta:p.beta,disp:p.disp});
     var floorDrop=(ivBase-ivStr).toFixed(1);
     var totals=BOOK_KEYS.map(function(k){return {k:k,t:full[k].price-base[k].price};});
     var worst=totals.reduce(function(a,b){return b.t<a.t?b:a;});
     var best=totals.reduce(function(a,b){return b.t>a.t?b:a;});
+    var inducedBps=Math.round(p.beta*(-eqShock)*100);
     var msg;
-    if(spShock>0){
-      msg='Spread <b>+'+Math.round(spShock*10000)+' bps</b> : bond floor recule de <b>'+floorDrop+' pts</b>. '+
-        'L’<b>OTM busted</b> est adossé au floor (peu de delta pour amortir), il prend de plein fouet la corrélation crédit-equity. '+
-        'L’<b>ITM deep</b> souffre surtout du choc actions, peu du crédit. L’<b>ATM</b> est entre les deux. Le <b>Blend</b> hérite mécaniquement de la pondération que tu as fixée.';
+    if(spShock>0||(p.beta>0&&eqShock<0)){
+      msg='Floor effectif recule de <b>'+floorDrop+' pts</b>. ';
+      if(p.beta>0&&eqShock<0){
+        msg+='Le coupling <b>β='+p.beta+' bps/1%</b> induit <b>+'+inducedBps+' bps</b> de widening additionnel sur le choc equity, '+
+          (spShock>0?'en plus des +'+Math.round(spShock*10000)+' bps idiosyncratiques. ':'sans aucun choc idiosyncratique externe. ');
+      } else {
+        msg+='Spread +'+Math.round(spShock*10000)+' bps idiosyncratique. ';
+      }
+      msg+='L’<b>OTM busted</b> est adossé au floor — il encaisse le credit-equity de plein fouet. L’<b>ITM deep</b> souffre surtout du choc actions. Le <b>Blend</b> moyenne les profils selon les poids.';
     } else {
-      msg='Sans écartement de spread, le floor tient. L’<b>OTM busted</b> bénéficie de la protection crédit, l’<b>ITM deep</b> suit l’action. Augmente le spread pour voir la corrélation crédit-equity casser la « double protection » de la jambe OTM.';
+      msg='Sans écartement de spread (β=0, pas de choc idio), le floor tient et la convexité travaille pour toi. Active β ou +spread pour casser la « double protection ».';
+    }
+    if(p.disp>0){
+      msg+=' <i>Dispersion δ='+Math.round(p.disp*100)+'% : pic ATM lissé, ailes OTM/ITM préservées plus longtemps.</i>';
     }
     msg+=' <span style="color:var(--dim)">[pire : '+BOOK_LABEL[worst.k]+' '+worst.t.toFixed(1)+' · meilleur : '+BOOK_LABEL[best.k]+' '+(best.t>=0?'+':'')+best.t.toFixed(1)+' pts]</span>';
     $("stressNote").innerHTML=msg;
@@ -496,10 +598,12 @@
 
   function setFoot(){
     $("foot").innerHTML='Modèle : décomposition bond floor + call (Black-Scholes sur la composante action). '+
-      'CB = valeur d’investissement [coupon + face actualisés à r+spread] + (100/Cp)·call(S,Cp). '+
+      'CB = valeur d’investissement [coupon + face actualisés à r+spread(S)] + (100/Cp)·call(S,Cp). '+
       'Parité-delta = N(d1) ; $gamma = (100/Cp)·Γ·S² ; theta = loyer optionnel seul (le carry obligataire des busted, positif, s’y ajoute hors graphe). '+
       'Blend = combinaison linéaire des trois livres aux poids normalisés. '+
-      'Outil pédagogique — ignore corrélation crédit-equity intra-move, dividendes, soft-call et path-dependency. fixb/cb_pricer.';
+      'Coupling crédit-equity : spread(S) = spread<sub>base</sub> + β·max(0, (S<sub>0</sub>−S)/S<sub>0</sub>) où β est exprimé en bps par −1% d’equity. '+
+      'Dispersion : chaque livre est un panier de noms avec σ<sub>idio</sub> = δ·σ, intégré par quadrature de Gauss-Hermite N=5 sur la log-normale idiosyncratique (vol commune conservée pour Black-Scholes par jambe). '+
+      'Outil pédagogique — dividendes, soft-call et path-dependency ignorés. fixb/cb_pricer.';
   }
 
   function exportCsv(){
@@ -527,8 +631,15 @@
 
   // ---- wire up ----
   $("spot").addEventListener('input',function(e){spotVal=+e.target.value;redraw();});
-  ['sig','mat','rf','cs','cpn','kAtm','kOtm','kItm','wAtm','wOtm','wItm'].forEach(function(id){
+  ['sig','mat','rf','cs','cpn','kAtm','kOtm','kItm','beta','disp','wAtm','wOtm','wItm'].forEach(function(id){
     $(id).addEventListener('input',redraw);
+  });
+  document.querySelectorAll('.hint').forEach(function(h){
+    h.onclick=function(){
+      $("beta").value=h.dataset.beta;
+      $("disp").value=h.dataset.disp;
+      redraw();
+    };
   });
   document.querySelectorAll('.wpresets button').forEach(function(b){
     b.onclick=function(){
@@ -538,7 +649,7 @@
     };
   });
   $("reset").onclick=function(){
-    var d={sig:30,mat:3,rf:3.5,cs:250,cpn:1.5,kAtm:100,kOtm:150,kItm:72,wAtm:33,wOtm:33,wItm:34};
+    var d={sig:30,mat:3,rf:3.5,cs:250,cpn:1.5,kAtm:100,kOtm:150,kItm:72,beta:0,disp:0,wAtm:33,wOtm:33,wItm:34};
     for(var k in d)$(k).value=d[k];
     spotVal=100;$("spot").value=100;eqShock=-0.20;spShock=0.0200;buildScn();redraw();
   };
